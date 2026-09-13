@@ -19,7 +19,7 @@ class CommsService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Tactical Mesh Active")
             .setContentText("Listening for incoming comms...")
-            .setSmallIcon(android.R.drawable.stat_sys_head_set)
+            .setSmallIcon(android.R.drawable.ic_menu_call)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .build()
