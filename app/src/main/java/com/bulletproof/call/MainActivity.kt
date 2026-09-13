@@ -2,7 +2,9 @@ package com.bulletproof.call
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -17,6 +19,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        startCommsService()
+
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -27,7 +31,6 @@ class MainActivity : Activity() {
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) {
                     runOnUiThread {
-                        // Grant all requested resources including mic capture
                         request.grant(request.resources)
                     }
                 }
@@ -54,6 +57,15 @@ class MainActivity : Activity() {
         loadApp()
     }
 
+    private fun startCommsService() {
+        val intent = Intent(this, CommsService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
     private fun loadApp() {
         webView.loadUrl(TARGET_URL)
     }
@@ -62,4 +74,3 @@ class MainActivity : Activity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 }
-
