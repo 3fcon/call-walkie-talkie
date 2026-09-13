@@ -56,7 +56,6 @@ class CommsService : Service() {
     }
 
     private fun connectSignalingSocket() {
-        // Points to persistent WS or relay endpoint bridging audio packets
         val request = Request.Builder().url("wss://shansoulstudio.in/call/ws-relay").build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -88,7 +87,7 @@ class CommsService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroyкта
+        super.onDestroy()
         audioTrack?.stop()
         audioTrack?.release()
         webSocket?.close(1000, "Service destroyed")
