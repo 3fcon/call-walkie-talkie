@@ -6,20 +6,22 @@ import android.content.pm.PackageManager
 import android.media.*
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private var isTransmitting by mutableStateOf(false)
     private var isReceiving by mutableStateOf(false)
     private var isConnected by mutableStateOf(false)
+    private var isToggleMode by mutableStateOf(false) // False = Hold-to-Talk, True = Tap ON/OFF
     
     private val sampleRate = 16000
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -69,87 +72,172 @@ class MainActivity : ComponentActivity() {
             else if (isReceiving) Color(0xFF3B82F6) // RX Blue
             else Color(0xFF1E293B) // Standby Slate
             
-            val statusText = if (isTransmitting) "TRANSMITTING TO FREQUENCY"
-            else if (isReceiving) "RECEIVING INCOMING AUDIO..."
-            else if (isConnected) "SYSTEM ONLINE • STANDBY"
-            else "CONNECTING TO MESH..."
+            val statusText = if (isTransmitting) "TRANSMITTING LIVE..."
+            else if (isReceiving) "RECEIVING AUDIO..."
+            else if (isConnected) "SYSTEM ONLINE • READY"
+            else "DISCONNECTED"
 
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF090D13))
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color(0xFF090D13)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(24.dp)
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.padding(20.dp)
                 ) {
-                    // Connection Status Pill
-                    Surface(
-                        color = if (isConnected) Color(0xFF065F46) else Color(0xFF7F1D1D),
-                        shape = CircleShape,
-                        modifier = Modifier.padding(bottom = 32.dp)
+                    // Top Bar: Connection Pill & Connect/Disconnect Button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        Surface(
+                            color = if (isConnected) Color(0xFF065F46) else Color(0xFF7F1D1D),
+                            shape = CircleShape
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(if (isConnected) Color(0xFF34D399) else Color(0xFFF87171), CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(if (isConnected) Color(0xFF34D399) else Color(0xFFF87171), CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isConnected) "MESH ACTIVE" else "OFFLINE",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isConnected) disconnectMesh() else initNetworkingAndAudio()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isConnected) Color(0xFF475569) else Color(0xFF0284C7)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
                             Text(
-                                text = if (isConnected) "LOCAL MESH ACTIVE" else "CONNECTING...",
+                                text = if (isConnected) "DISCONNECT" else "CONNECT",
                                 color = Color.White,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    Text(
-                        text = statusText,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 40.dp)
-                    )
-                    
-                    // Giant Tactical PTT Button
-                    Button(
-                        onClick = {},
-                        modifier = Modifier
-                            .size(240.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        startTransmitting()
-                                        tryAwaitRelease()
-                                        stopTransmitting()
-                                    }
-                                )
-                            },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = bgColor),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 12.dp)
+                    // Middle Section: Status & Giant Talk Button
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = statusText,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 20.dp)
+                        )
+
+                        // Mode Selector (Hold vs Toggle ON/OFF)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        ) {
                             Text(
-                                text = if (isTransmitting) "TX" else if (isReceiving) "RX" else "PTT",
-                                color = Color.White,
-                                fontSize = 38.sp,
-                                fontWeight = FontWeight.Black
+                                text = "Mode: ${if (isToggleMode) "TAP ON/OFF" else "HOLD-TO-TALK"}",
+                                color = Color(0xFFA1A1AA),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Switch(
+                                checked = isToggleMode,
+                                onCheckedChange = { 
+                                    isToggleMode = it
+                                    if (isTransmitting) stopTransmitting()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF38BDF8))
+                            )
+                        }
+                        
+                        // Giant Tactical Button with Raw Touch Interop
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(220.dp)
+                                .background(bgColor, CircleShape)
+                                .pointerInteropFilter { event ->
+                                    if (!isConnected) {
+                                        Toast.makeText(this@MainActivity, "Connect to mesh first!", Toast.LENGTH_SHORT).show()
+                                        return@pointerInteropFilter false
+                                    }
+                                    
+                                    if (isToggleMode) {
+                                        // Tap Mode (ON/OFF)
+                                        if (event.action == MotionEvent.ACTION_DOWN) {
+                                            if (isTransmitting) stopTransmitting() else startTransmitting()
+                                        }
+                                    } else {
+                                        // Hold Mode
+                                        when (event.action) {
+                                            MotionEvent.ACTION_DOWN -> startTransmitting()
+                                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopTransmitting()
+                                        }
+                                    }
+                                    true
+                                }
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (isTransmitting) "LIVE" else if (isReceiving) "RX" else "TALK",
+                                    color = Color.White,
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isTransmitting) "TAP/RELEASE TO STOP" else if (isToggleMode) "TAP TO TOGGLE" else "HOLD TO TALK",
+                                    color = Color(0xAAFFFFFF),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Bottom Instructions Card
+                    Surface(
+                        color = Color(0xFF131A24),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "QUICK INSTRUCTIONS",
+                                color = Color(0xFF38BDF8),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (isTransmitting) "TRANSMITTING..." else if (isReceiving) "RECEIVING..." else "HOLD TO TALK",
-                                color = Color(0xAAFFFFFF),
+                                text = "• Connect both phones to the same Wi-Fi or Hotspot.\n• Hold or Tap the button to broadcast your voice instantly.\n• Background service keeps connection alive while screen is on.",
+                                color = Color(0xFF94A3B8),
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
+                                lineHeight = 16.sp
                             )
                         }
                     }
@@ -177,16 +265,29 @@ class MainActivity : ComponentActivity() {
                 .build()
                 
             audioTrack?.play()
-            
             startListeningThread()
+            Toast.makeText(this, "Connected to Local Mesh", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
             isConnected = false
-            Toast.makeText(this, "Failed to bind to network port", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Connection failed. Check Wi-Fi.", Toast.LENGTH_SHORT).show()
         }
     }
 
+    private fun disconnectMesh() {
+        stopTransmitting()
+        isRunning = false
+        multicastLock?.release()
+        socket?.close()
+        audioTrack?.stop()
+        audioTrack?.release()
+        socket = null
+        isConnected = false
+        Toast.makeText(this, "Disconnected from mesh", Toast.LENGTH_SHORT).show()
+    }
+
     private fun startListeningThread() {
+        isRunning = true
         thread {
             val receiveData = ByteArray(bufferSize)
             while (isRunning) {
@@ -197,7 +298,7 @@ class MainActivity : ComponentActivity() {
                     if (!isTransmitting) {
                         isReceiving = true
                         audioTrack?.write(packet.data, 0, packet.length)
-                        window.decorView.postDelayed({ isReceiving = false }, 400)
+                        window.decorView.postDelayed({ isReceiving = false }, 300)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -207,6 +308,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startTransmitting() {
+        if (isTransmitting) return
         isTransmitting = true
         thread {
             try {
@@ -241,10 +343,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        isRunning = false
-        multicastLock?.release()
-        socket?.close()
-        audioTrack?.stop()
-        audioTrack?.release()
+        disconnectMesh()
     }
 }
