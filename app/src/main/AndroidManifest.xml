@@ -12,9 +12,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_call"
+        android:icon="@drawable/ic_walkie_talkie"
         android:label="CALL"
-        android:roundIcon="@android:drawable/ic_menu_call"
+        android:roundIcon="@drawable/ic_walkie_talkie"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
 
