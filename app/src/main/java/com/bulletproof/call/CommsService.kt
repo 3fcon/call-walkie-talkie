@@ -135,7 +135,7 @@ class CommsService : Service() {
         }
     }
 
-    override onDestroy() {
+    override fun onDestroy() {
         super.onDestroy()
         instance = null
         stopComms()
