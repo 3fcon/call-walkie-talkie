@@ -3,6 +3,8 @@ package com.bulletproof.call
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -10,9 +12,12 @@ import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.MotionEvent
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import okhttp3.OkHttpClient
@@ -48,12 +53,66 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        ipInput = findViewById(R.id.ipInput)
-        connectBtn = findViewById(R.id.connectBtn)
-        pttBtn = findViewById(R.id.pttBtn)
-        statusTv = findViewById(R.id.statusTv)
+        val rootLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(48, 80, 48, 48)
+            setBackgroundColor(Color.parseColor("#121212"))
+        }
+
+        statusTv = TextView(this).apply {
+            text = "Status: OFFLINE"
+            setTextColor(Color.RED)
+            textSize = 20f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        rootLayout.addView(statusTv)
+
+        ipInput = EditText(this).apply {
+            hint = "Server IP:Port (e.g. 192.168.1.6:8080)"
+            setHintTextColor(Color.GRAY)
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setBackgroundColor(Color.parseColor("#1E1E1E"))
+            setPadding(32, 24, 32, 24)
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 40, 0, 24) }
+            layoutParams = params
+        }
+        rootLayout.addView(ipInput)
+
+        connectBtn = Button(this).apply {
+            text = "CONNECT"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#007ACC"))
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, 80) }
+            layoutParams = params
+        }
+        rootLayout.addView(connectBtn)
+
+        pttBtn = Button(this).apply {
+            text = "HOLD TO TALK"
+            setTextColor(Color.WHITE)
+            textSize = 22f
+            typeface = Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.parseColor("#D32F2F"))
+            val btnSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 220f, resources.displayMetrics
+            ).toInt()
+            layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+        }
+        rootLayout.addView(pttBtn)
+
+        setContentView(rootLayout)
 
         checkPermissions()
         setupAudioTrack()
@@ -73,8 +132,16 @@ class MainActivity : Activity() {
 
         pttBtn.setOnTouchListener { _, event ->
             when (event.action) {
-                MotionEvent.ACTION_DOWN -> startRecording()
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopRecording()
+                MotionEvent.ACTION_DOWN -> {
+                    pttBtn.setBackgroundColor(Color.parseColor("#388E3C"))
+                    pttBtn.text = "TRANSMITTING..."
+                    startRecording()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    pttBtn.setBackgroundColor(Color.parseColor("#D32F2F"))
+                    pttBtn.text = "HOLD TO TALK"
+                    stopRecording()
+                }
             }
             true
         }
@@ -87,7 +154,8 @@ class MainActivity : Activity() {
     }
 
     private fun connectWebSocket(address: String) {
-        val url = if (address.startsWith("ws://") || address.startsWith("wss://")) address else "ws://$address"
+        val cleanAddr = address.removePrefix("http://").removePrefix("https://")
+        val url = if (cleanAddr.startsWith("ws://") || cleanAddr.startsWith("wss://")) cleanAddr else "ws://$cleanAddr"
         val request = Request.Builder().url(url).build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
@@ -95,8 +163,9 @@ class MainActivity : Activity() {
                 isConnected = true
                 runOnUiThread {
                     statusTv.text = "Status: MESH ACTIVE"
-                    statusTv.setTextColor(android.graphics.Color.GREEN)
+                    statusTv.setTextColor(Color.GREEN)
                     connectBtn.text = "DISCONNECT"
+                    connectBtn.setBackgroundColor(Color.parseColor("#424242"))
                 }
             }
 
@@ -127,8 +196,9 @@ class MainActivity : Activity() {
     private fun updateDisconnectedUI() {
         isConnected = false
         statusTv.text = "Status: OFFLINE"
-        statusTv.setTextColor(android.graphics.Color.RED)
+        statusTv.setTextColor(Color.RED)
         connectBtn.text = "CONNECT"
+        connectBtn.setBackgroundColor(Color.parseColor("#007ACC"))
         webSocket = null
     }
 
