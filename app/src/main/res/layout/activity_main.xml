@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#090b10">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TACTICAL TAC-COM // APP"
+        android:textColor="#00f0ff"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OFFLINE"
+        android:textColor="#6b7794"
+        android:textSize="14sp"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/nameInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Callsign / Name"
+        android:text="Operator"
+        android:textColor="#f0f4fc"
+        android:textColorHint="#6b7794"
+        android:background="#121620"
+        android:padding="12dp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/connectBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="CONNECT"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/listenOnlyBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="LISTEN-ONLY"
+        android:enabled="false"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/disconnectBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="DISCONNECT"
+        android:enabled="false"
+        android:backgroundTint="#ff3366"/>
+
+</LinearLayout>
