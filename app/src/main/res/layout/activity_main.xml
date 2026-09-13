@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:padding="20dp"
+    android:padding="16dp"
     android:background="#090b10"
     android:clipToPadding="false">
 
@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="14dp">
 
         <TextView
             android:layout_width="0dp"
@@ -22,9 +22,9 @@
             android:layout_weight="1"
             android:text="TACTICAL TAC-COM // APP"
             android:textColor="#00f0ff"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold"
-            android:letterSpacing="0.15" />
+            android:letterSpacing="0.1" />
 
         <LinearLayout
             android:id="@+id/statusBadge"
@@ -32,16 +32,16 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="6dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="5dp"
             android:background="@drawable/bg_status_offline">
 
             <View
                 android:id="@+id/statusIndicator"
-                android:layout_width="7dp"
-                android:layout_height="7dp"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
                 android:background="@drawable/dot_red"
-                android:layout_marginEnd="8dp" />
+                android:layout_marginEnd="6dp" />
 
             <TextView
                 android:id="@+id/statusText"
@@ -49,9 +49,9 @@
                 android:layout_height="wrap_content"
                 android:text="OFFLINE"
                 android:textColor="#ff3366"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.1" />
+                android:letterSpacing="0.08" />
         </LinearLayout>
     </LinearLayout>
 
@@ -61,21 +61,21 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="10dp"
         android:background="#121620"
         android:padding="6dp">
 
         <EditText
             android:id="@+id/callsignInput"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="34dp"
             android:layout_weight="1"
             android:hint="Operator"
             android:text="Sanee"
             android:textColor="#f0f4fc"
             android:textColorHint="#6b7794"
             android:background="@null"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="10dp"
             android:textSize="12sp"
             android:fontFamily="monospace"
             android:gravity="center_vertical" />
@@ -83,9 +83,9 @@
         <Button
             android:id="@+id/connectToggleBtn"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="30dp"
             android:text="CONNECT"
-            android:textSize="10sp"
+            android:textSize="9sp"
             android:textStyle="bold"
             android:textColor="#00f0ff"
             android:backgroundTint="#1f2b45"
@@ -93,76 +93,85 @@
             android:insetBottom="0dp" />
     </LinearLayout>
 
-    <!-- Mode Selector Pills -->
+    <!-- Mode Selector Pills (Fixed Letter Clipping) -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#121620"
-        android:padding="4dp"
+        android:padding="3dp"
         android:elevation="4dp"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="20dp"
+        android:gravity="center">
 
         <Button
             android:id="@+id/modeToggleBtn"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="28dp"
+            android:layout_weight="1"
             android:text="TOGGLE"
-            android:textSize="10sp"
+            android:textSize="8sp"
             android:textStyle="bold"
             android:textColor="#00f0ff"
             android:backgroundTint="#1e2638"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:minWidth="60dp" />
+            android:padding="2dp" />
 
         <Button
             android:id="@+id/modeHoldBtn"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="28dp"
+            android:layout_weight="0.8"
             android:text="HOLD"
-            android:textSize="10sp"
+            android:textSize="8sp"
             android:textStyle="bold"
             android:textColor="#6b7794"
             android:backgroundTint="@android:color/transparent"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:minWidth="50dp" />
+            android:padding="2dp" />
 
         <Button
             android:id="@+id/rxOnlyBtn"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="28dp"
+            android:layout_weight="1.2"
             android:text="LISTEN-ONLY"
-            android:textSize="10sp"
+            android:textSize="8sp"
             android:textStyle="bold"
             android:textColor="#6b7794"
             android:backgroundTint="@android:color/transparent"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:enabled="false" />
+            android:enabled="false"
+            android:padding="2dp" />
 
         <Button
             android:id="@+id/disconnectBtn"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="28dp"
+            android:layout_weight="1.1"
             android:text="DISCONNECT"
-            android:textSize="10sp"
+            android:textSize="8sp"
             android:textStyle="bold"
             android:textColor="#ff3366"
             android:backgroundTint="@android:color/transparent"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:enabled="false" />
+            android:enabled="false"
+            android:padding="2dp" />
     </LinearLayout>
 
-    <!-- PTT Circular Wrapper -->
+    <!-- PTT Interactive FrameLayout (Fixes text overlay vanishing) -->
     <FrameLayout
-        android:id="@+id/pttContainer"
+        android:id="@+id/pttTouchArea"
         android:layout_width="220dp"
         android:layout_height="220dp"
         android:gravity="center"
-        android:layout_marginBottom="24dp">
+        android:clickable="true"
+        android:focusable="true"
+        android:layout_marginBottom="20dp">
 
         <View
             android:id="@+id/glowRing"
@@ -170,19 +179,14 @@
             android:layout_height="match_parent"
             android:background="@drawable/bg_glow_idle" />
 
-        <Button
-            android:id="@+id/pttBtn"
+        <View
+            android:id="@+id/pttVisualCircle"
             android:layout_width="170dp"
             android:layout_height="170dp"
             android:layout_gravity="center"
-            android:background="@drawable/bg_ptt_idle"
-            android:enabled="false"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:insetLeft="0dp"
-            android:insetRight="0dp" />
+            android:background="@drawable/bg_ptt_idle" />
 
-        <!-- Overlay Text for PTT Button -->
+        <!-- Overlay Text Container (Always visible & crisp) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -197,11 +201,12 @@
                 android:layout_height="wrap_content"
                 android:text="OFFLINE"
                 android:textColor="#f0f4fc"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1" />
 
             <TextView
+                android:id="@+n/pttSub"
                 android:id="@+id/pttSub"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -209,7 +214,8 @@
                 android:textColor="#6b7794"
                 android:textSize="9sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.08" />
+                android:letterSpacing="0.08"
+                android:layout_marginTop="2dp" />
         </LinearLayout>
     </FrameLayout>
 
@@ -218,15 +224,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#121620"
-        android:padding="16dp"
+        android:padding="14dp"
         android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingBottom="8dp"
-            android:layout_marginBottom="8dp">
+            android:paddingBottom="6dp"
+            android:layout_marginBottom="6dp">
 
             <TextView
                 android:layout_width="0dp"
@@ -234,18 +240,18 @@
                 android:layout_weight="1"
                 android:text="ACTIVE NODES"
                 android:textColor="#6b7794"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.1" />
+                android:letterSpacing="0.08" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="MESH P2P"
                 android:textColor="#6b7794"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.1" />
+                android:letterSpacing="0.08" />
         </LinearLayout>
 
         <LinearLayout
@@ -256,14 +262,13 @@
             android:gravity="center_vertical"
             android:visibility="gone"
             android:background="#1e2638"
-            android:padding="10dp"
-            android:layout_marginBottom="6dp">
+            android:padding="8dp">
 
             <View
-                android:layout_width="7dp"
-                android:layout_height="7dp"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
                 android:background="@drawable/dot_green"
-                android:layout_marginEnd="10dp" />
+                android:layout_marginEnd="8dp" />
 
             <TextView
                 android:id="@+id/displayCallsign"
@@ -272,7 +277,7 @@
                 android:layout_weight="1"
                 android:text="Sanee"
                 android:textColor="#f0f4fc"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -280,10 +285,10 @@
                 android:layout_height="wrap_content"
                 android:text="YOU"
                 android:textColor="#00f0ff"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:background="#1f2b45"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="6dp"
                 android:paddingVertical="2dp" />
         </LinearLayout>
     </LinearLayout>
