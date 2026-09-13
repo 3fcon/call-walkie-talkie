@@ -9,11 +9,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="CALL"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         
         <activity
             android:name=".MainActivity"
@@ -27,3 +25,4 @@
     </application>
 
 </manifest>
+
