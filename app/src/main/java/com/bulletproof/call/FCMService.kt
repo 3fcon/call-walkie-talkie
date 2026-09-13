@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -24,8 +25,11 @@ class FCMService : FirebaseMessagingService() {
 
         if (action == "ptt_ring" || action == "wake_audio") {
             showIncomingCallNotification(sender)
+            playDirectRingtone()
             
-            val serviceIntent = Intent(this, CommsService::class.java)
+            val serviceIntent = Intent(this, CommsService::class.java).apply {
+                putExtra("listen_only", false) // Default mode
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
@@ -36,8 +40,14 @@ class FCMService : FirebaseMessagingService() {
 
     private fun showIncomingCallNotification(sender: String) {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Tactical PTT Calls",
@@ -45,13 +55,12 @@ class FCMService : FirebaseMessagingService() {
             ).apply {
                 description = "Incoming walkie-talkie call alerts"
                 enableVibration(true)
+                setSound(ringtoneUri, audioAttributes)
             }
             manager.createNotificationChannel(channel)
         }
 
-        val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        
-        val flagImmutable = 0x4000000 // Removed invalid 'const' inside function scope
+        val flagImmutable = 0x4000000
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("auto_connect", true)
@@ -77,7 +86,13 @@ class FCMService : FirebaseMessagingService() {
         manager.notify(NOTIFICATION_ID, notification)
     }
 
-    override fun onNewToken(token: String) {
-        super.onNewToken(token)
+    private fun playDirectRingtone() {
+        try {
+            val alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            val r = RingtoneManager.getRingtone(applicationContext, alert)
+            r.play()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
