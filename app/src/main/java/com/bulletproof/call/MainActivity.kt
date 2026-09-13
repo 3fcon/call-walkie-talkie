@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -39,7 +40,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pttSub: TextView
     private lateinit var selfSquadItem: LinearLayout
     private lateinit var displayCallsign: TextView
-    private lateinit var activeNodesLabel: TextView
 
     private var isConnected = false
     private var isTransmitting = false
@@ -50,7 +50,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        webEngine = findViewById(R.id.webEngine)
         statusBadge = findViewById(R.id.statusBadge)
         statusIndicator = findViewById(R.id.statusIndicator)
         statusText = findViewById(R.id.statusText)
@@ -66,10 +65,9 @@ class MainActivity : AppCompatActivity() {
         pttSub = findViewById(R.id.pttSub)
         selfSquadItem = findViewById(R.id.selfSquadItem)
         displayCallsign = findViewById(R.id.displayCallsign)
-        activeNodesLabel = findViewById(R.id.activeNodesLabel)
 
         checkPermissions()
-        setupWebEngine()
+        setupDynamicWebEngine()
 
         connectToggleBtn.setOnClickListener {
             if (isConnected) disconnectSession() else connectSession()
@@ -125,7 +123,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebEngine() {
+    private fun setupDynamicWebEngine() {
+        webEngine = WebView(this)
+        findViewById<ViewGroup>(android.R.id.content).addView(webEngine, ViewGroup.LayoutParams(1, 1))
+
         webEngine.settings.javaScriptEnabled = true
         webEngine.settings.domStorageEnabled = true
         webEngine.settings.mediaPlaybackRequiresUserGesture = false
@@ -134,7 +135,8 @@ class MainActivity : AppCompatActivity() {
                 request.grant(request.resources)
             }
         }
-        webEngine.addJavascriptInterface(object {
+
+        class NativeBridge {
             @JavascriptInterface
             fun onConnected() {
                 runOnUiThread {
@@ -153,58 +155,59 @@ class MainActivity : AppCompatActivity() {
             }
 
             @JavascriptInterface
-            fun onNodeCount(count: Int) {
-                runOnUiThread {
-                    activeNodesLabel.text = "ACTIVE NODES ($count)"
-                }
-            }
-
-            @JavascriptInterface
             fun onDisconnected() {
-                runOnUiThread {
-                    disconnectSession()
-                }
+                runOnUiThread { disconnectSession() }
             }
-        }, "AndroidHost")
+        }
 
-        // Invisible Engine HTML running PeerJS inside OS WebRTC
+        webEngine.addJavascriptInterface(NativeBridge(), "AndroidHost")
+
         val engineHtml = """
             <!DOCTYPE html>
             <html>
             <head><script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script></head>
             <body>
             <script>
-                let localStream = null, peer = null, myId = null, myName = "Sanee";
-                let pollTimer = null, presenceTimer = null;
-                const activeCalls = new Map();
-                let isListenOnlyMode = false;
+                var localStream = null;
+                var peer = null;
+                var myId = null;
+                var myName = "Sanee";
+                var pollTimer = null;
+                var presenceTimer = null;
+                var activeCalls = {};
+                var isListenOnlyMode = false;
 
-                async function startEngine(name) {
+                function startEngine(name) {
                     myName = name || "Operator";
                     myId = "app_" + myName.toLowerCase().replace(/[^a-z0-9]/g, '_') + "_" + Math.floor(100+Math.random()*900);
-                    try {
-                        localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-                        localStream.getAudioTracks()[0].enabled = false;
-                    } catch(e){}
+                    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false })
+                    .then(function(s) {
+                        localStream = s;
+                        if(localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = false;
+                        initPeer();
+                    }).catch(function() {
+                        initPeer();
+                    });
+                }
 
+                function initPeer() {
                     peer = new Peer(myId, { debug: 0, config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] } });
-                    peer.on('open', () => {
+                    peer.on('open', function() {
                         AndroidHost.onConnected();
                         register();
                         presenceTimer = setInterval(register, 5000);
                         pollTimer = setInterval(poll, 3000);
                     });
-
-                    peer.on('call', (call) => {
+                    peer.on('call', function(call) {
                         call.answer(localStream);
                         handleCall(call);
-                        activeCalls.set(call.peer, call);
+                        activeCalls[call.peer] = call;
                     });
                 }
 
                 function handleCall(call) {
-                    call.on('stream', (stream) => {
-                        let audio = document.getElementById('aud_' + call.peer);
+                    call.on('stream', function(stream) {
+                        var audio = document.getElementById('aud_' + call.peer);
                         if (!audio) {
                             audio = document.createElement('audio');
                             audio.id = 'aud_' + call.peer;
@@ -212,54 +215,56 @@ class MainActivity : AppCompatActivity() {
                             document.body.appendChild(audio);
                         }
                         audio.srcObject = stream;
-                        audio.play().catch(()=>{});
+                        audio.play().catch(function(){});
                     });
-                    call.on('close', () => {
-                        const a = document.getElementById('aud_' + call.peer);
+                    call.on('close', function() {
+                        var a = document.getElementById('aud_' + call.peer);
                         if (a) a.remove();
-                        activeCalls.delete(call.peer);
+                        delete activeCalls[call.peer];
                     });
                 }
 
-                async function register() {
+                function register() {
                     if (!myId) return;
-                    fetch('https://shansoulstudio.in/call/api.php?action=register&id=' + encodeURIComponent(myId) + '&name=' + encodeURIComponent(myName)).catch(()=>{});
+                    fetch('https://shansoulstudio.in/call/api.php?action=register&id=' + encodeURIComponent(myId) + '&name=' + encodeURIComponent(myName)).catch(function(){});
                 }
 
-                async function poll() {
-                    try {
-                        const res = await fetch('https://shansoulstudio.in/call/api.php');
-                        const nodes = await res.json();
-                        AndroidHost.onNodeCount(Object.keys(nodes).length);
-                        for (const peerId of Object.keys(nodes)) {
-                            if (peerId !== myId && !activeCalls.has(peerId)) {
-                                const call = peer.call(peerId, localStream);
+                function poll() {
+                    fetch('https://shansoulstudio.in/call/api.php')
+                    .then(function(r){ return r.json(); })
+                    .then(function(nodes) {
+                        for (var peerId in nodes) {
+                            if (peerId !== myId && !activeCalls[peerId]) {
+                                var call = peer.call(peerId, localStream);
                                 if (call) {
                                     handleCall(call);
-                                    activeCalls.set(peerId, call);
+                                    activeCalls[peerId] = call;
                                 }
                             }
                         }
-                    } catch(e){}
+                    }).catch(function(){});
                 }
 
                 function setMic(active) {
                     if (!localStream || isListenOnlyMode) return;
-                    localStream.getAudioTracks()[0].enabled = active;
+                    if(localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = active;
                 }
 
                 function setListenOnly(val) {
                     isListenOnlyMode = val;
-                    if (val && localStream) localStream.getAudioTracks()[0].enabled = false;
+                    if (val && localStream && localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = false;
                 }
 
                 function stopEngine() {
                     if (pollTimer) clearInterval(pollTimer);
                     if (presenceTimer) clearInterval(presenceTimer);
-                    if (myId) fetch('https://shansoulstudio.in/call/api.php?action=unregister&id=' + encodeURIComponent(myId)).catch(()=>{});
-                    activeCalls.forEach(c => c.close());
-                    activeCalls.clear();
-                    if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream = null; }
+                    if (myId) fetch('https://shansoulstudio.in/call/api.php?action=unregister&id=' + encodeURIComponent(myId)).catch(function(){});
+                    for (var k in activeCalls) { activeCalls[k].close(); }
+                    activeCalls = {};
+                    if (localStream) {
+                        localStream.getTracks().forEach(function(t){ t.stop(); });
+                        localStream = null;
+                    }
                     if (peer) { peer.destroy(); peer = null; }
                 }
             </script>
@@ -293,7 +298,6 @@ class MainActivity : AppCompatActivity() {
         pttTouchArea.isEnabled = false
         pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_idle)
         pttText.text = "OFFLINE"
-        activeNodesLabel.text = "ACTIVE NODES (0)"
         updateSubtext()
     }
 
