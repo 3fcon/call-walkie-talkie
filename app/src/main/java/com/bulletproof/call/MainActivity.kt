@@ -11,6 +11,7 @@ import android.view.View
 import android.view.MotionEvent
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -28,7 +29,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeHoldBtn: Button
     private lateinit var rxOnlyBtn: Button
     private lateinit var disconnectBtn: Button
-    private lateinit var pttBtn: Button
+    private lateinit var pttTouchArea: FrameLayout
+    private lateinit var pttVisualCircle: View
     private lateinit var pttText: TextView
     private lateinit var pttSub: TextView
     private lateinit var selfSquadItem: LinearLayout
@@ -53,7 +55,8 @@ class MainActivity : AppCompatActivity() {
         modeHoldBtn = findViewById(R.id.modeHoldBtn)
         rxOnlyBtn = findViewById(R.id.rxOnlyBtn)
         disconnectBtn = findViewById(R.id.disconnectBtn)
-        pttBtn = findViewById(R.id.pttBtn)
+        pttTouchArea = findViewById(R.id.pttTouchArea)
+        pttVisualCircle = findViewById(R.id.pttVisualCircle)
         pttText = findViewById(R.id.pttText)
         pttSub = findViewById(R.id.pttSub)
         selfSquadItem = findViewById(R.id.selfSquadItem)
@@ -146,13 +149,13 @@ class MainActivity : AppCompatActivity() {
         if (isListenOnly) {
             rxOnlyBtn.setTextColor(0xFFFFAA00.toInt())
             rxOnlyBtn.text = "RX: ON"
-            pttBtn.isEnabled = false
-            pttBtn.setBackgroundResource(R.drawable.bg_ptt_rx)
+            pttTouchArea.isEnabled = false
+            pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_rx)
         } else {
             rxOnlyBtn.setTextColor(0xFF6B7794.toInt())
             rxOnlyBtn.text = "LISTEN-ONLY"
-            pttBtn.isEnabled = isConnected
-            pttBtn.setBackgroundResource(R.drawable.bg_ptt_idle)
+            pttTouchArea.isEnabled = isConnected
+            pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_idle)
         }
         updateSubtext()
     }
@@ -165,12 +168,12 @@ class MainActivity : AppCompatActivity() {
             statusText.setTextColor(0xFF00FF88.toInt())
             connectToggleBtn.text = "DISCONNECT"
             callsignInput.isEnabled = false
-            pttBtn.isEnabled = true
+            pttTouchArea.isEnabled = true
             modeToggleBtn.isEnabled = true
             modeHoldBtn.isEnabled = true
             rxOnlyBtn.isEnabled = true
             disconnectBtn.isEnabled = true
-            pttBtn.setBackgroundResource(R.drawable.bg_ptt_idle)
+            pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_idle)
             pttText.text = "MIC OFF"
         } else {
             statusBadge.setBackgroundResource(R.drawable.bg_status_offline)
@@ -179,12 +182,12 @@ class MainActivity : AppCompatActivity() {
             statusText.setTextColor(0xFFFF3366.toInt())
             connectToggleBtn.text = "CONNECT"
             callsignInput.isEnabled = true
-            pttBtn.isEnabled = false
+            pttTouchArea.isEnabled = false
             modeToggleBtn.isEnabled = false
             modeHoldBtn.isEnabled = false
             rxOnlyBtn.isEnabled = false
             disconnectBtn.isEnabled = false
-            pttBtn.setBackgroundResource(R.drawable.bg_ptt_idle)
+            pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_idle)
             pttText.text = "OFFLINE"
         }
         updateRxUI()
@@ -210,7 +213,7 @@ class MainActivity : AppCompatActivity() {
     private fun startTx() {
         if (!isConnected || isListenOnly) return
         isTransmitting = true
-        pttBtn.setBackgroundResource(R.drawable.bg_ptt_active)
+        pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_active)
         pttText.text = "MIC LIVE"
         CommsService.instance?.setListenOnlyMode(false)
         updateSubtext()
@@ -219,7 +222,7 @@ class MainActivity : AppCompatActivity() {
     private fun stopTxForce() {
         isTransmitting = false
         if (!isListenOnly) {
-            pttBtn.setBackgroundResource(R.drawable.bg_ptt_idle)
+            pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_idle)
             if (isConnected) pttText.text = "MIC OFF"
         }
         updateSubtext()
@@ -227,7 +230,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupPttTouchBehavior() {
-        pttBtn.setOnTouchListener { _, event ->
+        pttTouchArea.setOnTouchListener { _, event ->
             if (!isConnected || isListenOnly) return@setOnTouchListener false
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
