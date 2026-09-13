@@ -3,259 +3,57 @@ package com.bulletproof.call
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.graphics.Typeface
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.AudioTrack
-import android.media.MediaRecorder
 import android.os.Bundle
-import android.util.Log
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.MotionEvent
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
 
 class MainActivity : Activity() {
 
-    private var webSocket: WebSocket? = null
-    private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
-
-    private var audioRecord: AudioRecord? = null
-    private var audioTrack: AudioTrack? = null
-    private var isRecording = false
-    private var isConnected = false
-
-    private val sampleRate = 16000
-    private val channelConfigIn = AudioFormat.CHANNEL_IN_MONO
-    private val channelConfigOut = AudioFormat.CHANNEL_OUT_MONO
-    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-    private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat)
-
-    private lateinit var ipInput: EditText
-    private lateinit var connectBtn: Button
-    private lateinit var pttBtn: Button
-    private lateinit var statusTv: TextView
+    private lateinit var webView: WebView
+    private val TARGET_URL = "https://shansoulstudio.in/call/"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val rootLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(48, 80, 48, 48)
-            setBackgroundColor(Color.parseColor("#121212"))
-        }
+        webView = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
 
-        statusTv = TextView(this).apply {
-            text = "Status: OFFLINE"
-            setTextColor(Color.RED)
-            textSize = 20f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        rootLayout.addView(statusTv)
-
-        ipInput = EditText(this).apply {
-            hint = "Server IP:Port (e.g. 192.168.1.6:8080)"
-            setHintTextColor(Color.GRAY)
-            setTextColor(Color.WHITE)
-            textSize = 16f
-            setBackgroundColor(Color.parseColor("#1E1E1E"))
-            setPadding(32, 24, 32, 24)
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 40, 0, 24) }
-            layoutParams = params
-        }
-        rootLayout.addView(ipInput)
-
-        connectBtn = Button(this).apply {
-            text = "CONNECT"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#007ACC"))
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 80) }
-            layoutParams = params
-        }
-        rootLayout.addView(connectBtn)
-
-        pttBtn = Button(this).apply {
-            text = "HOLD TO TALK"
-            setTextColor(Color.WHITE)
-            textSize = 22f
-            typeface = Typeface.DEFAULT_BOLD
-            setBackgroundColor(Color.parseColor("#D32F2F"))
-            val btnSize = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 220f, resources.displayMetrics
-            ).toInt()
-            layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            }
-        }
-        rootLayout.addView(pttBtn)
-
-        setContentView(rootLayout)
-
-        checkPermissions()
-        setupAudioTrack()
-
-        connectBtn.setOnClickListener {
-            if (!isConnected) {
-                val ip = ipInput.text.toString().trim()
-                if (ip.isNotEmpty()) {
-                    connectWebSocket(ip)
-                } else {
-                    Toast.makeText(this, "Enter Server IP", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                disconnectWebSocket()
-            }
-        }
-
-        pttBtn.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    pttBtn.setBackgroundColor(Color.parseColor("#388E3C"))
-                    pttBtn.text = "TRANSMITTING..."
-                    startRecording()
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    pttBtn.setBackgroundColor(Color.parseColor("#D32F2F"))
-                    pttBtn.text = "HOLD TO TALK"
-                    stopRecording()
+            webChromeClient = object : WebChromeClient() {
+                // Auto-grant microphone access inside the native container
+                override fun onPermissionRequest(request: PermissionRequest?) {
+                    request?.grant(request.resources)
                 }
             }
-            true
         }
-    }
 
-    private fun checkPermissions() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
-        }
-    }
+        setContentView(webView)
 
-    private fun connectWebSocket(address: String) {
-        val cleanAddr = address.removePrefix("http://").removePrefix("https://")
-        val url = if (cleanAddr.startsWith("ws://") || cleanAddr.startsWith("wss://")) cleanAddr else "ws://$cleanAddr"
-        val request = Request.Builder().url(url).build()
-
-        webSocket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                isConnected = true
-                runOnUiThread {
-                    statusTv.text = "Status: MESH ACTIVE"
-                    statusTv.setTextColor(Color.GREEN)
-                    connectBtn.text = "DISCONNECT"
-                    connectBtn.setBackgroundColor(Color.parseColor("#424242"))
-                }
-            }
-
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                val pcmData = bytes.toByteArray()
-                audioTrack?.write(pcmData, 0, pcmData.size)
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                runOnUiThread { updateDisconnectedUI() }
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e("WebSocket", "Connection Failed: ${t.message}")
-                runOnUiThread {
-                    updateDisconnectedUI()
-                    Toast.makeText(this@MainActivity, "Connection failed", Toast.LENGTH_SHORT).show()
-                }
-            }
-        })
-    }
-
-    private fun disconnectWebSocket() {
-        webSocket?.close(1000, "User disconnected")
-        updateDisconnectedUI()
-    }
-
-    private fun updateDisconnectedUI() {
-        isConnected = false
-        statusTv.text = "Status: OFFLINE"
-        statusTv.setTextColor(Color.RED)
-        connectBtn.text = "CONNECT"
-        connectBtn.setBackgroundColor(Color.parseColor("#007ACC"))
-        webSocket = null
-    }
-
-    private fun setupAudioTrack() {
-        val minBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat)
-        audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.MODIFY_AUDIO_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS),
+                101
             )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(audioFormat)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelConfigOut)
-                    .build()
-            )
-            .setBufferSizeInBytes(minBufferSize)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
-
-        audioTrack?.play()
-    }
-
-    private fun startRecording() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-
-        audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfigIn, audioFormat, bufferSize)
-        audioRecord?.startRecording()
-        isRecording = true
-
-        thread {
-            val buffer = ByteArray(bufferSize)
-            while (isRecording) {
-                val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-                if (bytesRead > 0 && webSocket != null) {
-                    webSocket?.send(buffer.toByteString(0, bytesRead))
-                }
-            }
+        } else {
+            loadApp()
         }
     }
 
-    private fun stopRecording() {
-        isRecording = false
-        audioRecord?.stop()
-        audioRecord?.release()
-        audioRecord = null
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        loadApp()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        isRecording = false
-        disconnectWebSocket()
-        audioTrack?.stop()
-        audioTrack?.release()
+    private fun loadApp() {
+        webView.loadUrl(TARGET_URL)
+    }
+
+    override fun onBackPressed() {
+        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 }
-
