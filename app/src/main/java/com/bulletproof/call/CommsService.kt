@@ -5,42 +5,137 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import okhttp3.*
+import okio.ByteString
 
 class CommsService : Service() {
-
     private val CHANNEL_ID = "tac_mesh_channel"
+    private val client = OkHttpClient()
+    private var webSocket: WebSocket? = null
+    private var audioTrack: AudioTrack? = null
+    private var audioRecord: AudioRecord? = null
+    private var isRecording = false
+
+    private val sampleRate = 16000
+    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+    private val channelConfigOut = AudioFormat.CHANNEL_OUT_MONO
+    private val channelConfigIn = AudioFormat.CHANNEL_IN_MONO
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Tactical Mesh Active")
-            .setContentText("Background service active...")
-            .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setOngoing(true)
-            .build()
-        startForeground(1001, notification)
+        startForeground(1001, buildNotification("Tactical Mesh Live — Audio Bridged"))
+        setupAudioTrack()
+        setupAudioRecordAndStream()
+        connectWebSocket()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+    private fun setupAudioTrack() {
+        val minBuf = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat)
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(audioFormat)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(channelConfigOut)
+                    .build()
+            )
+            .setBufferSizeInBytes(minBuf)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
+        audioTrack?.play()
     }
+
+    private fun setupAudioRecordAndStream() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat)
+        audioRecord = AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            channelConfigIn,
+            audioFormat,
+            minBuf * 2
+        )
+        isRecording = true
+        Thread {
+            val buffer = ByteArray(minBuf)
+            try {
+                audioRecord?.startRecording()
+                while (isRecording) {
+                    val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                    if (read > 0) {
+                        webSocket?.send(ByteString.of(buffer, 0, read))
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
+    private fun connectWebSocket() {
+        val request = Request.Builder().url("wss://shansoulstudio.in/call/ws-relay").build()
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                webSocket.send("""{"type":"register","id":"bg_node_${System.currentTimeMillis()}"}""")
+            }
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                val data = bytes.toByteArray()
+                audioTrack?.write(data, 0, data.size)
+            }
+            override fun onMessage(webSocket: WebSocket, text: String) {}
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                // Auto-reconnect pulse fallback handled via sticky loop
+            }
+        })
+    }
+
+    private fun buildNotification(text: String): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("CALL Tactical PTT")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setOngoing(true)
+            .build()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID,
-                "Tactical Mesh Background Service",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(serviceChannel)
+            val channel = NotificationChannel(CHANNEL_ID, "Tactical Comms", NotificationManager.IMPORTANCE_HIGH)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isRecording = false
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioTrack?.stop()
+        audioTrack?.release()
+        webSocket?.close(1000, "Service destroyed")
     }
 }
