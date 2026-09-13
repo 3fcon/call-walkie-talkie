@@ -93,7 +93,7 @@
             android:insetBottom="0dp" />
     </LinearLayout>
 
-    <!-- Mode Selector Pills (Fixed Letter Clipping) -->
+    <!-- Mode Selector Pills -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -163,7 +163,7 @@
             android:padding="2dp" />
     </LinearLayout>
 
-    <!-- PTT Interactive FrameLayout (Fixes text overlay vanishing) -->
+    <!-- PTT Interactive FrameLayout -->
     <FrameLayout
         android:id="@+id/pttTouchArea"
         android:layout_width="220dp"
@@ -186,7 +186,7 @@
             android:layout_gravity="center"
             android:background="@drawable/bg_ptt_idle" />
 
-        <!-- Overlay Text Container (Always visible & crisp) -->
+        <!-- Overlay Text Container -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -206,7 +206,6 @@
                 android:letterSpacing="0.1" />
 
             <TextView
-                android:id="@+n/pttSub"
                 android:id="@+id/pttSub"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
