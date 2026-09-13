@@ -1,6 +1,7 @@
 package com.bulletproof.call
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -14,16 +15,17 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import okhttp3.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private var webSocket: WebSocket? = null
     private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
@@ -39,7 +41,6 @@ class MainActivity : AppCompatActivity() {
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
     private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat)
 
-    // UI Elements
     private lateinit var ipInput: EditText
     private lateinit var connectBtn: Button
     private lateinit var pttBtn: Button
@@ -49,7 +50,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Ensure these IDs match your activity_main.xml exactly
         ipInput = findViewById(R.id.ipInput)
         connectBtn = findViewById(R.id.connectBtn)
         pttBtn = findViewById(R.id.pttBtn)
@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
                 if (ip.isNotEmpty()) {
                     connectWebSocket(ip)
                 } else {
-                    Toast.makeText(this, "Enter Server IP (e.g., 192.168.1.6:8080)", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Enter Server IP", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 disconnectWebSocket()
@@ -81,13 +81,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
     }
 
     private fun connectWebSocket(address: String) {
-        // Automatically append ws:// if the user forgets
         val url = if (address.startsWith("ws://") || address.startsWith("wss://")) address else "ws://$address"
         val request = Request.Builder().url(url).build()
 
@@ -102,7 +101,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                // Instantly play incoming audio from the server
                 val pcmData = bytes.toByteArray()
                 audioTrack?.write(pcmData, 0, pcmData.size)
             }
@@ -115,7 +113,7 @@ class MainActivity : AppCompatActivity() {
                 Log.e("WebSocket", "Connection Failed: ${t.message}")
                 runOnUiThread {
                     updateDisconnectedUI()
-                    Toast.makeText(this@MainActivity, "Connection failed. Check IP/Port.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Connection failed", Toast.LENGTH_SHORT).show()
                 }
             }
         })
@@ -153,13 +151,13 @@ class MainActivity : AppCompatActivity() {
             .setBufferSizeInBytes(minBufferSize)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-        
+
         audioTrack?.play()
     }
 
     private fun startRecording() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-        
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+
         audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfigIn, audioFormat, bufferSize)
         audioRecord?.startRecording()
         isRecording = true
@@ -169,7 +167,6 @@ class MainActivity : AppCompatActivity() {
             while (isRecording) {
                 val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                 if (bytesRead > 0 && webSocket != null) {
-                    // Corrected extension function syntax
                     webSocket?.send(buffer.toByteString(0, bytesRead))
                 }
             }
@@ -191,3 +188,4 @@ class MainActivity : AppCompatActivity() {
         audioTrack?.release()
     }
 }
+
