@@ -1,76 +1,102 @@
 package com.bulletproof.call
 
-import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.webkit.PermissionRequest
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private val TARGET_URL = "https://shansoulstudio.in/call/"
+    private lateinit var statusText: TextView
+    private lateinit var nameInput: EditText
+    private lateinit var connectBtn: Button
+    private lateinit var disconnectBtn: Button
+    private lateinit var listenOnlyBtn: Button
+
+    private var isConnected = false
+    private var isListenOnly = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        startCommsService()
+        statusText = findViewById(R.id.statusText)
+        nameInput = findViewById(R.id.nameInput)
+        connectBtn = findViewById(R.id.connectBtn)
+        disconnectBtn = findViewById(R.id.disconnectBtn)
+        listenOnlyBtn = findViewById(R.id.listenOnlyBtn)
 
-        webView = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            settings.databaseEnabled = true
-            settings.cacheMode = WebSettings.LOAD_DEFAULT
+        checkPermissions()
 
-            webChromeClient = object : WebChromeClient() {
-                override fun onPermissionRequest(request: PermissionRequest) {
-                    runOnUiThread {
-                        request.grant(request.resources)
-                    }
-                }
-            }
+        connectBtn.setOnClickListener {
+            connectSession()
         }
 
-        setContentView(webView)
+        disconnectBtn.setOnClickListener {
+            disconnectSession()
+        }
 
-        val permissions = arrayOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.MODIFY_AUDIO_SETTINGS
-        )
+        listenOnlyBtn.setOnClickListener {
+            toggleListenOnly()
+        }
 
-        val needed = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (needed.isNotEmpty()) {
-            requestPermissions(needed.toTypedArray(), 200)
-        } else {
-            loadApp()
+        updateUIState()
+    }
+
+    private fun checkPermissions() {
+        val perms = mutableListOf(android.Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val missing = perms.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        loadApp()
-    }
+    private fun connectSession() {
+        isConnected = true
+        isListenOnly = false
+        updateUIState()
 
-    private fun startCommsService() {
-        val intent = Intent(this, CommsService::class.java)
+        val serviceIntent = Intent(this, CommsService::class.java).apply {
+            putExtra("listen_only", false)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+            startForegroundService(serviceIntent)
         } else {
-            startService(intent)
+            startService(serviceIntent)
         }
     }
 
-    private fun loadApp() {
-        webView.loadUrl(TARGET_URL)
+    private fun disconnectSession() {
+        isConnected = false
+        isListenOnly = false
+        CommsService.instance?.stopComms()
+        stopService(Intent(this, CommsService::class.java))
+        updateUIState()
     }
 
-    override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    private fun toggleListenOnly() {
+        isListenOnly = !isListenOnly
+        CommsService.instance?.setListenOnlyMode(isListenOnly)
+        updateUIState()
+    }
+
+    private fun updateUIState() {
+        val currentName = nameInput.text.toString().ifEmpty { "Operator" }
+        statusText.text = if (isConnected) "CONNECTED ($currentName)" else "OFFLINE"
+        connectBtn.isEnabled = !isConnected
+        disconnectBtn.isEnabled = isConnected
+        listenOnlyBtn.isEnabled = isConnected
+        listenOnlyBtn.text = if (isListenOnly) "RX ONLY: ON (MUTED)" else "LISTEN-ONLY"
     }
 }
