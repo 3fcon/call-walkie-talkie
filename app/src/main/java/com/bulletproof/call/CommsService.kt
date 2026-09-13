@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import okhttp3.*
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 
 class CommsService : Service() {
     private val CHANNEL_ID = "tac_mesh_channel"
@@ -82,7 +83,7 @@ class CommsService : Service() {
                 while (isRecording) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
-                        webSocket?.send(ByteString.of(buffer, 0, read))
+                        webSocket?.send(buffer.toByteString(0, read))
                     }
                 }
             } catch (e: Exception) {
