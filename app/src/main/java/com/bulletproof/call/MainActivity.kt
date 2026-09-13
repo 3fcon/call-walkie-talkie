@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0 && webSocket != null) {
                         // Send raw PCM bytes to Node.js server
-                        webSocket?.send(ByteString.of(buffer, 0, read))
+                        webSocket?.send(buffer.toByteString(0, bytesRead))
                     }
                 }
                 
