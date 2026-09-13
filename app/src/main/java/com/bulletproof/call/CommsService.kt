@@ -26,19 +26,45 @@ class CommsService : Service() {
     private var audioTrack: AudioTrack? = null
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
+    private var isListenOnly = false
 
     private val sampleRate = 16000
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
     private val channelConfigOut = AudioFormat.CHANNEL_OUT_MONO
     private val channelConfigIn = AudioFormat.CHANNEL_IN_MONO
 
+    companion object {
+        var instance: CommsService? = null
+    }
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createNotificationChannel()
         startForeground(1001, buildNotification("Tactical Mesh Live — Audio Bridged"))
         setupAudioTrack()
-        setupAudioRecordAndStream()
         connectWebSocket()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        isListenOnly = intent?.getBooleanExtra("listen_only", false) == true
+        if (!isListenOnly) {
+            setupAudioRecordAndStream()
+        } else {
+            stopAudioRecording()
+        }
+        return START_STICKY
+    }
+
+    fun setListenOnlyMode(listenOnly: Boolean) {
+        isListenOnly = listenOnly
+        if (listenOnly) {
+            stopAudioRecording()
+            updateNotification("Listen-Only Mode (Mic Muted)")
+        } else {
+            setupAudioRecordAndStream()
+            updateNotification("Full Duplex PTT Active")
+        }
     }
 
     private fun setupAudioTrack() {
@@ -64,6 +90,7 @@ class CommsService : Service() {
     }
 
     private fun setupAudioRecordAndStream() {
+        if (isRecording) return
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             return
         }
@@ -80,7 +107,7 @@ class CommsService : Service() {
             val buffer = ByteArray(minBuf)
             try {
                 audioRecord?.startRecording()
-                while (isRecording) {
+                while (isRecording && !isListenOnly) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
                         webSocket?.send(buffer.toByteString(0, read))
@@ -90,6 +117,17 @@ class CommsService : Service() {
                 e.printStackTrace()
             }
         }.start()
+    }
+
+    private fun stopAudioRecording() {
+        isRecording = false
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        audioRecord = null
     }
 
     private fun connectWebSocket() {
@@ -103,9 +141,7 @@ class CommsService : Service() {
                 audioTrack?.write(data, 0, data.size)
             }
             override fun onMessage(webSocket: WebSocket, text: String) {}
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                // Auto-reconnect pulse fallback handled via sticky loop
-            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {}
         })
     }
 
@@ -119,7 +155,10 @@ class CommsService : Service() {
             .build()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    private fun updateNotification(text: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.notify(1001, buildNotification(text))
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -132,9 +171,8 @@ class CommsService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        isRecording = false
-        audioRecord?.stop()
-        audioRecord?.release()
+        instance = null
+        stopAudioRecording()
         audioTrack?.stop()
         audioTrack?.release()
         webSocket?.close(1000, "Service destroyed")
