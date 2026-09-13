@@ -32,14 +32,13 @@ import kotlin.concurrent.thread
 class MainActivity : ComponentActivity() {
     private var isTransmitting by mutableStateOf(false)
     private var isReceiving by mutableStateOf(false)
+    private var isConnected by mutableStateOf(false)
     
-    // Audio configuration for raw PCM voice transport
     private val sampleRate = 16000
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
     private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
     
-    // Network configuration for "At all costs" UDP Multicast Broadcast
     private val port = 50000
     private val multicastGroup = "224.0.0.1" 
     
@@ -49,7 +48,6 @@ class MainActivity : ComponentActivity() {
     private var multicastLock: WifiManager.MulticastLock? = null
     private var isRunning = true
 
-    // Permission launcher for Android 6.0+ dynamic permissions
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -71,23 +69,57 @@ class MainActivity : ComponentActivity() {
             else if (isReceiving) Color(0xFF3B82F6) // RX Blue
             else Color(0xFF1E293B) // Standby Slate
             
-            val statusText = if (isTransmitting) "TRANSMITTING TO ALL"
-            else if (isReceiving) "RECEIVING TRANSMISSION..."
-            else "SYSTEM READY • STANDBY"
+            val statusText = if (isTransmitting) "TRANSMITTING TO FREQUENCY"
+            else if (isReceiving) "RECEIVING INCOMING AUDIO..."
+            else if (isConnected) "SYSTEM ONLINE • STANDBY"
+            else "CONNECTING TO MESH..."
 
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize().background(Color(0xFF090D13))
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF090D13))
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    // Connection Status Pill
+                    Surface(
+                        color = if (isConnected) Color(0xFF065F46) else Color(0xFF7F1D1D),
+                        shape = CircleShape,
+                        modifier = Modifier.padding(bottom = 32.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(if (isConnected) Color(0xFF34D399) else Color(0xFFF87171), CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isConnected) "LOCAL MESH ACTIVE" else "CONNECTING...",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
                     Text(
                         text = statusText,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        modifier = Modifier.padding(bottom = 60.dp)
+                        letterSpacing = 1.5.sp,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 40.dp)
                     )
                     
+                    // Giant Tactical PTT Button
                     Button(
                         onClick = {},
                         modifier = Modifier
@@ -102,11 +134,23 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = bgColor)
+                        colors = ButtonDefaults.buttonColors(containerColor = bgColor),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 12.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("PTT", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black)
-                            Text("HOLD TO TALK", color = Color(0xAAFFFFFF), fontSize = 12.sp, modifier = Modifier.padding(top=8.dp))
+                            Text(
+                                text = if (isTransmitting) "TX" else if (isReceiving) "RX" else "PTT",
+                                color = Color.White,
+                                fontSize = 38.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (isTransmitting) "TRANSMITTING..." else if (isReceiving) "RECEIVING..." else "HOLD TO TALK",
+                                color = Color(0xAAFFFFFF),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
@@ -116,15 +160,14 @@ class MainActivity : ComponentActivity() {
 
     private fun initNetworkingAndAudio() {
         try {
-            // Multicast Lock is strictly required to receive UDP broadcasts on modern Android when screen is off
             val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             multicastLock = wifi.createMulticastLock("CallWalkieTalkieLock")
             multicastLock?.acquire()
 
             socket = MulticastSocket(port)
             socket?.joinGroup(InetAddress.getByName(multicastGroup))
+            isConnected = true
             
-            // Setup AudioTrack for playback
             val outBufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, audioFormat)
             audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
@@ -138,6 +181,7 @@ class MainActivity : ComponentActivity() {
             startListeningThread()
         } catch (e: Exception) {
             e.printStackTrace()
+            isConnected = false
             Toast.makeText(this, "Failed to bind to network port", Toast.LENGTH_SHORT).show()
         }
     }
@@ -150,12 +194,10 @@ class MainActivity : ComponentActivity() {
                     val packet = DatagramPacket(receiveData, receiveData.size)
                     socket?.receive(packet)
                     
-                    // Do not play back our own echo if we are transmitting
                     if (!isTransmitting) {
                         isReceiving = true
                         audioTrack?.write(packet.data, 0, packet.length)
-                        // Auto-reset receiving UI state
-                        window.decorView.postDelayed({ isReceiving = false }, 500)
+                        window.decorView.postDelayed({ isReceiving = false }, 400)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
