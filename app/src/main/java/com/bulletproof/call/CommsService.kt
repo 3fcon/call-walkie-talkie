@@ -16,7 +16,6 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import okhttp3.*
-import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
 class CommsService : Service() {
@@ -48,80 +47,41 @@ class CommsService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         isListenOnly = intent?.getBooleanExtra("listen_only", false) == true
-        if (!isListenOnly) {
-            setupAudioRecordAndStream()
-        } else {
-            stopAudioRecording()
-        }
+        if (!isListenOnly) { setupAudioRecordAndStream() } else { stopAudioRecording() }
         return START_STICKY
     }
 
     fun setListenOnlyMode(listenOnly: Boolean) {
         isListenOnly = listenOnly
-        if (listenOnly) {
-            stopAudioRecording()
-            updateNotification("Listen-Only Mode (Mic Muted)")
-        } else {
-            setupAudioRecordAndStream()
-            updateNotification("Full Duplex PTT Active")
-        }
+        if (listenOnly) { stopAudioRecording(); updateNotification("Listen-Only Mode (Mic Muted)") }
+        else { setupAudioRecordAndStream(); updateNotification("Full Duplex PTT Active") }
     }
 
     fun stopComms() {
         isRecording = false
         stopAudioRecording()
-        try {
-            audioTrack?.stop()
-            audioTrack?.release()
-        } catch (e: Exception) { e.printStackTrace() }
+        try { audioTrack?.stop(); audioTrack?.release() } catch (e: Exception) { e.printStackTrace() }
         audioTrack = null
-
         webSocket?.close(1000, "Manual disconnect")
         webSocket = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) { stopForeground(STOP_FOREGROUND_REMOVE) } else { @Suppress("DEPRECATION") stopForeground(true) }
         stopSelf()
     }
 
     private fun setupAudioTrack() {
         val minBuf = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat)
         audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(audioFormat)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelConfigOut)
-                    .build()
-            )
-            .setBufferSizeInBytes(minBuf)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            .setAudioFormat(AudioFormat.Builder().setEncoding(audioFormat).setSampleRate(sampleRate).setChannelMask(channelConfigOut).build())
+            .setBufferSizeInBytes(minBuf).setTransferMode(AudioTrack.MODE_STREAM).build()
         audioTrack?.play()
     }
 
     private fun setupAudioRecordAndStream() {
         if (isRecording) return
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            return
-        }
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, audioFormat)
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            sampleRate,
-            channelConfigIn,
-            audioFormat,
-            minBuf * 2
-        )
+        audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfigIn, audioFormat, minBuf * 2)
         isRecording = true
         Thread {
             val buffer = ByteArray(minBuf)
@@ -129,24 +89,15 @@ class CommsService : Service() {
                 audioRecord?.startRecording()
                 while (isRecording && !isListenOnly) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-                    if (read > 0) {
-                        webSocket?.send(buffer.toByteString(0, read))
-                    }
+                    if (read > 0) { webSocket?.send(buffer.toByteString(0, read)) }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }.start()
     }
 
     private fun stopAudioRecording() {
         isRecording = false
-        try {
-            audioRecord?.stop()
-            audioRecord?.release()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { audioRecord?.stop(); audioRecord?.release() } catch (e: Exception) { e.printStackTrace() }
         audioRecord = null
     }
 
@@ -154,9 +105,9 @@ class CommsService : Service() {
         val request = Request.Builder().url("wss://shansoulstudio.in/call/ws-relay").build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send("""{"type":"register","id":"app_node_${System.currentTimeMillis()}"}""")
+                webSocket.send("""{"type":"register","id":"app_${System.currentTimeMillis()}","name":"Sanee"}""")
             }
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
                 val data = bytes.toByteArray()
                 audioTrack?.write(data, 0, data.size)
             }
@@ -167,17 +118,12 @@ class CommsService : Service() {
 
     private fun buildNotification(text: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("CALL Tactical PTT")
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setOngoing(true)
-            .build()
+            .setContentTitle("CALL Tactical PTT").setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_menu_call).setPriority(NotificationCompat.PRIORITY_MAX).setOngoing(true).build()
     }
 
     private fun updateNotification(text: String) {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager?.notify(1001, buildNotification(text))
+        getSystemService(NotificationManager::class.java)?.notify(1001, buildNotification(text))
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -189,12 +135,9 @@ class CommsService : Service() {
         }
     }
 
-    override fun onDestroy() {
+    override onDestroy() {
         super.onDestroy()
         instance = null
-        stopAudioRecording()
-        audioTrack?.stop()
-        audioTrack?.release()
-        webSocket?.close(1000, "Service destroyed")
+        stopComms()
     }
 }
