@@ -6,22 +6,21 @@ import android.content.pm.PackageManager
 import android.media.*
 import android.net.wifi.WifiManager
 import android.os.Bundle
-import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -171,31 +170,30 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         
-                        // Giant Tactical Button with Raw Touch Interop
+                        // Giant Tactical Button using stable Compose detectTapGestures
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(220.dp)
                                 .background(bgColor, CircleShape)
-                                .pointerInteropFilter { event ->
-                                    if (!isConnected) {
-                                        Toast.makeText(this@MainActivity, "Connect to mesh first!", Toast.LENGTH_SHORT).show()
-                                        return@pointerInteropFilter false
-                                    }
+                                .pointerInput(isToggleMode, isConnected) {
+                                    if (!isConnected) return@pointerInput
                                     
                                     if (isToggleMode) {
-                                        // Tap Mode (ON/OFF)
-                                        if (event.action == MotionEvent.ACTION_DOWN) {
-                                            if (isTransmitting) stopTransmitting() else startTransmitting()
-                                        }
+                                        detectTapGestures(
+                                            onTap = {
+                                                if (isTransmitting) stopTransmitting() else startTransmitting()
+                                            }
+                                        )
                                     } else {
-                                        // Hold Mode
-                                        when (event.action) {
-                                            MotionEvent.ACTION_DOWN -> startTransmitting()
-                                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopTransmitting()
-                                        }
+                                        detectTapGestures(
+                                            onPress = {
+                                                startTransmitting()
+                                                tryAwaitRelease()
+                                                stopTransmitting()
+                                            }
+                                        )
                                     }
-                                    true
                                 }
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -234,7 +232,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "• Connect both phones to the same Wi-Fi or Hotspot.\n• Hold or Tap the button to broadcast your voice instantly.\n• Background service keeps connection alive while screen is on.",
+                                text = "• Connect both phones to the same Wi-Fi or Hotspot.\n• Hold or Tap the button to broadcast your voice instantly.\n• Use the toggle to switch between Hold-to-Talk and Tap ON/OFF.",
                                 color = Color(0xFF94A3B8),
                                 fontSize = 11.sp,
                                 lineHeight = 16.sp
