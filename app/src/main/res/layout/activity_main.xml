@@ -3,62 +3,301 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
-    android:padding="24dp"
-    android:background="#090b10">
+    android:gravity="center_horizontal"
+    android:padding="20dp"
+    android:background="#090b10"
+    android:clipToPadding="false">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="TACTICAL TAC-COM // APP"
-        android:textColor="#00f0ff"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp"/>
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="OFFLINE"
-        android:textColor="#6b7794"
-        android:textSize="14sp"
-        android:layout_marginBottom="16dp"/>
-
-    <EditText
-        android:id="@+id/nameInput"
+    <!-- Header -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter Callsign / Name"
-        android:text="Operator"
-        android:textColor="#f0f4fc"
-        android:textColorHint="#6b7794"
+        android:maxWidth="420dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TACTICAL TAC-COM // APP"
+            android:textColor="#00f0ff"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15" />
+
+        <LinearLayout
+            android:id="@+n/statusBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/bg_status_offline">
+
+            <View
+                android:id="@+n/statusIndicator"
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:background="@drawable/dot_red"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+n/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OFFLINE"
+                android:textColor="#ff3366"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Identity / Callsign Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxWidth="420dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp"
         android:background="#121620"
-        android:padding="12dp"
+        android:padding="6dp"
+        android:backgroundTint="#1e2638">
+
+        <EditText
+            android:id="@+n/callsignInput"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:hint="Operator"
+            android:text="Sanee"
+            android:textColor="#f0f4fc"
+            android:textColorHint="#6b7794"
+            android:background="@null"
+            android:paddingHorizontal="12dp"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:gravity="center_vertical" />
+
+        <Button
+            android:id="@+n/connectToggleBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="CONNECT"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#00f0ff"
+            android:backgroundTint="#1f2b45"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
+    </LinearLayout>
+
+    <!-- Mode Selector Pills -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#121620"
+        android:padding="4dp"
+        android:elevation="4dp"
+        android:layout_marginBottom="24dp">
+
+        <Button
+            android:id="@+n/modeToggleBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="TOGGLE"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#00f0ff"
+            android:backgroundTint="#1e2638"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="60dp" />
+
+        <Button
+            android:id="@+n/modeHoldBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="HOLD"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#6b7794"
+            android:backgroundTint="@android:color/transparent"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="50dp" />
+
+        <Button
+            android:id="@+n/rxOnlyBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="LISTEN-ONLY"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#6b7794"
+            android:backgroundTint="@android:color/transparent"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:enabled="false" />
+
+        <Button
+            android:id="@+n/disconnectBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:text="DISCONNECT"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#ff3366"
+            android:backgroundTint="@android:color/transparent"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:enabled="false" />
+    </LinearLayout>
+
+    <!-- PTT Circular Wrapper -->
+    <FrameLayout
+        android:id="@+n/pttContainer"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
         android:gravity="center"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="24dp">
 
-    <Button
-        android:id="@+id/connectBtn"
+        <View
+            android:id="@+n/glowRing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_glow_idle" />
+
+        <Button
+            android:id="@+n/pttBtn"
+            android:layout_width="170dp"
+            android:layout_height="170dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_ptt_idle"
+            android:enabled="false"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:insetLeft="0dp"
+            android:insetRight="0dp" />
+
+        <!-- Overlay Text & Icon for PTT Button -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="false">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@android:drawable/ic_menu_mic"
+                android:tint="#f0f4fc"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+n/pttText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                text="OFFLINE"
+                android:text="OFFLINE"
+                android:textColor="#f0f4fc"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:id="@+n/pttSub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CONNECT TO ENGAGE"
+                android:textColor="#6b7794"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Squad Card -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="CONNECT"
-        android:layout_marginBottom="12dp"/>
+        android:maxWidth="420dp"
+        android:background="#121620"
+        android:padding="16dp"
+        android:orientation="vertical">
 
-    <Button
-        android:id="@+id/listenOnlyBtn"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="LISTEN-ONLY"
-        android:enabled="false"
-        android:layout_marginBottom="12dp"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="8dp"
+            android:layout_marginBottom="8dp">
 
-    <Button
-        android:id="@+id/disconnectBtn"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="DISCONNECT"
-        android:enabled="false"
-        android:backgroundTint="#ff3366"/>
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="ACTIVE NODES"
+                android:textColor="#6b7794"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MESH P2P"
+                android:textColor="#6b7794"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+n/selfSquadItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:background="#1e2638"
+            android:padding="10dp"
+            android:layout_marginBottom="6dp">
+
+            <View
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:background="@drawable/dot_green"
+                android:layout_marginEnd="10dp" />
+
+            <TextView
+                android:id="@+n/displayCallsign"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sanee"
+                android:textColor="#f0f4fc"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="YOU"
+                android:textColor="#00f0ff"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:background="#1f2b45"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp" />
+        </LinearLayout>
+    </LinearLayout>
 
 </LinearLayout>
