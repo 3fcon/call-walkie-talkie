@@ -67,6 +67,26 @@ class CommsService : Service() {
         }
     }
 
+    fun stopComms() {
+        isRecording = false
+        stopAudioRecording()
+        try {
+            audioTrack?.stop()
+            audioTrack?.release()
+        } catch (e: Exception) { e.printStackTrace() }
+        audioTrack = null
+
+        webSocket?.close(1000, "Manual disconnect")
+        webSocket = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+        stopSelf()
+    }
+
     private fun setupAudioTrack() {
         val minBuf = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, audioFormat)
         audioTrack = AudioTrack.Builder()
@@ -134,7 +154,7 @@ class CommsService : Service() {
         val request = Request.Builder().url("wss://shansoulstudio.in/call/ws-relay").build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send("""{"type":"register","id":"bg_node_${System.currentTimeMillis()}"}""")
+                webSocket.send("""{"type":"register","id":"app_node_${System.currentTimeMillis()}"}""")
             }
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 val data = bytes.toByteArray()
