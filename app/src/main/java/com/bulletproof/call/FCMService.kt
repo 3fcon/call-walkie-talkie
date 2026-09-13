@@ -25,7 +25,6 @@ class FCMService : FirebaseMessagingService() {
         if (action == "ptt_ring" || action == "wake_audio") {
             showIncomingCallNotification(sender)
             
-            // Auto-start sticky service background anchor
             val serviceIntent = Intent(this, CommsService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
@@ -52,15 +51,14 @@ class FCMService : FirebaseMessagingService() {
 
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         
-        // Intent to open MainActivity/Accept
-        const val FLAG_IMMUTABLE = 0x4000000 // Compatibility flag
+        val flagImmutable = 0x4000000 // Removed invalid 'const' inside function scope
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("auto_connect", true)
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or flagImmutable
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -81,6 +79,5 @@ class FCMService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Send this token to your PHP/Node backend mapped to user ID
     }
 }
