@@ -21,24 +21,29 @@ class MainActivity : Activity() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
+            settings.databaseEnabled = true
             settings.cacheMode = WebSettings.LOAD_DEFAULT
 
             webChromeClient = object : WebChromeClient() {
-                // Auto-grant microphone access inside the native container
-                override fun onPermissionRequest(request: PermissionRequest?) {
-                    request?.grant(request.resources)
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    runOnUiThread {
+                        // Grant all requested resources including mic capture
+                        request.grant(request.resources)
+                    }
                 }
             }
         }
 
         setContentView(webView)
 
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(Manifest.permission.MODIFY_AUDIO_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS),
-                101
-            )
+        val permissions = arrayOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS
+        )
+
+        val needed = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (needed.isNotEmpty()) {
+            requestPermissions(needed.toTypedArray(), 200)
         } else {
             loadApp()
         }
@@ -57,3 +62,4 @@ class MainActivity : Activity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 }
+
