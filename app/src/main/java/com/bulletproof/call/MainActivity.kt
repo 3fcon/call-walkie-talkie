@@ -1,6 +1,7 @@
+@file:Suppress("DEPRECATION")
+
 package com.bulletproof.call
 
-@Suppress("DEPRECATION")
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -157,7 +158,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUIState() {
-        val nameVal = callsignInput.text.toString().ifEmpty { "Operator" }
         if (isConnected) {
             statusBadge.setBackgroundResource(R.drawable.bg_status_online)
             statusIndicator.setBackgroundResource(R.drawable.dot_green)
