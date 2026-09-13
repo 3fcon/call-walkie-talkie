@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- ... existing code ... -->
 <!-- STREAMING_CHUNK:Requesting critical network and audio permissions -->
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-<application
+​<!-- Required for local network multicasting on Android 13+ (API 33+) -->
+<uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+​<application
 android:allowBackup="true"
+<!-- ... existing code ... -->
 android:icon="@android:drawable/ic_btn_speak_now"
 android:label="CALL"
 android:supportsRtl="true"
