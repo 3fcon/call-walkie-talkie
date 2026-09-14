@@ -3,9 +3,16 @@
 package com.bulletproof.call
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Vibrator
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +28,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -40,11 +48,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pttSub: TextView
     private lateinit var selfSquadItem: LinearLayout
     private lateinit var displayCallsign: TextView
+    private lateinit var nodesContainer: LinearLayout
+    private lateinit var activeNodesHeader: TextView
 
     private var isConnected = false
     private var isTransmitting = false
     private var isListenOnly = false
     private var currentMode = "toggle"
+
+    private var ringtone: Ringtone? = null
+    private var ringDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +78,8 @@ class MainActivity : AppCompatActivity() {
         pttSub = findViewById(R.id.pttSub)
         selfSquadItem = findViewById(R.id.selfSquadItem)
         displayCallsign = findViewById(R.id.displayCallsign)
+        nodesContainer = findViewById(R.id.nodesContainer)
+        activeNodesHeader = findViewById(R.id.activeNodesHeader)
 
         checkPermissions()
         setupDynamicWebEngine()
@@ -155,6 +170,20 @@ class MainActivity : AppCompatActivity() {
             }
 
             @JavascriptInterface
+            fun onIncomingCall(caller: String) {
+                runOnUiThread {
+                    triggerIncomingAlert(caller)
+                }
+            }
+
+            @JavascriptInterface
+            fun updateNodes(jsonStr: String) {
+                runOnUiThread {
+                    renderNodesList(jsonStr)
+                }
+            }
+
+            @JavascriptInterface
             fun onDisconnected() {
                 runOnUiThread { disconnectSession() }
             }
@@ -176,6 +205,7 @@ class MainActivity : AppCompatActivity() {
                 var presenceTimer = null;
                 var activeCalls = {};
                 var isListenOnlyMode = false;
+                var lastRingTime = 0;
 
                 function startEngine(name) {
                     myName = name || "Operator";
@@ -196,7 +226,7 @@ class MainActivity : AppCompatActivity() {
                         AndroidHost.onConnected();
                         register();
                         presenceTimer = setInterval(register, 5000);
-                        pollTimer = setInterval(poll, 3000);
+                        pollTimer = setInterval(poll, 2500);
                     });
                     peer.on('call', function(call) {
                         call.answer(localStream);
@@ -229,16 +259,29 @@ class MainActivity : AppCompatActivity() {
                     fetch('https://shansoulstudio.in/call/api.php?action=register&id=' + encodeURIComponent(myId) + '&name=' + encodeURIComponent(myName)).catch(function(){});
                 }
 
+                function triggerRing() {
+                    fetch('https://shansoulstudio.in/call/api.php?action=ring&caller=' + encodeURIComponent(myName) + '&id=' + encodeURIComponent(myId)).catch(function(){});
+                }
+
                 function poll() {
                     fetch('https://shansoulstudio.in/call/api.php')
                     .then(function(r){ return r.json(); })
-                    .then(function(nodes) {
-                        for (var peerId in nodes) {
-                            if (peerId !== myId && !activeCalls[peerId]) {
-                                var call = peer.call(peerId, localStream);
-                                if (call) {
-                                    handleCall(call);
-                                    activeCalls[peerId] = call;
+                    .then(function(data) {
+                        if (data.ring && data.ring.id !== myId && (Date.now() - data.ring.ts) < 8000) {
+                            if (data.ring.ts > lastRingTime) {
+                                lastRingTime = data.ring.ts;
+                                AndroidHost.onIncomingCall(data.ring.caller);
+                            }
+                        }
+                        if (data.peers) {
+                            AndroidHost.updateNodes(JSON.stringify(data.peers));
+                            for (var peerId in data.peers) {
+                                if (peerId !== myId && !activeCalls[peerId]) {
+                                    var call = peer.call(peerId, localStream);
+                                    if (call) {
+                                        handleCall(call);
+                                        activeCalls[peerId] = call;
+                                    }
                                 }
                             }
                         }
@@ -275,18 +318,136 @@ class MainActivity : AppCompatActivity() {
         webEngine.loadDataWithBaseURL("https://shansoulstudio.in/call/", engineHtml, "text/html", "UTF-8", null)
     }
 
+    private fun renderNodesList(jsonStr: String) {
+        try {
+            val json = JSONObject(jsonStr)
+            val currentSelfId = "app_" + callsignInput.text.toString().trim().lowercase()
+
+            for (i in nodesContainer.childCount - 1 downTo 1) {
+                nodesContainer.removeViewAt(i)
+            }
+
+            var count = 1
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val id = keys.next()
+                if (id.startsWith(currentSelfId)) continue
+
+                count++
+                val nodeObj = json.getJSONObject(id)
+                val nodeName = nodeObj.optString("name", "Node")
+                val isWeb = id.startsWith("web")
+
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(24, 20, 24, 20)
+                    setBackgroundColor(0xFF161C28.toInt())
+                    val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    lp.setMargins(0, 8, 0, 0)
+                    layoutParams = lp
+                }
+
+                val dot = View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(16, 16).apply {
+                        marginEnd = 16
+                    }
+                    setBackgroundResource(R.drawable.dot_green)
+                }
+
+                val nameTv = TextView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    text = "$nodeName (${if (isWeb) "WEB" else "APP"})"
+                    setTextColor(0xFFF0F4FC.toInt())
+                    textSize = 12f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                }
+
+                val badge = TextView(this).apply {
+                    text = "LINKED"
+                    setTextColor(0xFF00FF88.toInt())
+                    textSize = 9f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(16, 4, 16, 4)
+                    setBackgroundColor(0xFF1F2B45.toInt())
+                }
+
+                row.addView(dot)
+                row.addView(nameTv)
+                row.addView(badge)
+                nodesContainer.addView(row)
+            }
+            activeNodesHeader.text = "ACTIVE NODES ($count)"
+        } catch (_: Exception) {}
+    }
+
+    private fun triggerIncomingAlert(caller: String) {
+        if (ringDialog?.isShowing == true) return
+
+        try {
+            val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ringtone = RingtoneManager.getRingtone(applicationContext, alertUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone?.isLooping = true
+            }
+            ringtone?.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            ringtone?.play()
+
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            vibrator?.vibrate(longArrayOf(0, 800, 400, 800, 400), 0)
+        } catch (_: Exception) {}
+
+        ringDialog = AlertDialog.Builder(this)
+            .setTitle("🚨 INCOMING CALL")
+            .setMessage("$caller is calling on Tactical Mesh!")
+            .setCancelable(false)
+            .setPositiveButton("ACCEPT CALL") { d, _ ->
+                stopRinging()
+                d.dismiss()
+            }
+            .setNegativeButton("DISMISS") { d, _ ->
+                stopRinging()
+                d.dismiss()
+            }
+            .create()
+
+        ringDialog?.show()
+    }
+
+    private fun stopRinging() {
+        try {
+            ringtone?.stop()
+            ringtone = null
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            vibrator?.cancel()
+        } catch (_: Exception) {}
+    }
+
     private fun connectSession() {
         val name = callsignInput.text.toString().ifEmpty { "Sanee" }
         displayCallsign.text = "$name (APP)"
         selfSquadItem.visibility = View.VISIBLE
+
+        val serviceIntent = Intent(this, CommsService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+
         webEngine.evaluateJavascript("startEngine('$name');", null)
     }
 
     private fun disconnectSession() {
+        stopRinging()
         isConnected = false
         isTransmitting = false
         isListenOnly = false
         selfSquadItem.visibility = View.GONE
+
+        stopService(Intent(this, CommsService::class.java))
         webEngine.evaluateJavascript("stopEngine();", null)
 
         statusBadge.setBackgroundResource(R.drawable.bg_status_offline)
@@ -306,7 +467,7 @@ class MainActivity : AppCompatActivity() {
         isTransmitting = true
         pttVisualCircle.setBackgroundResource(R.drawable.bg_ptt_active)
         pttText.text = "MIC LIVE"
-        webEngine.evaluateJavascript("setMic(true);", null)
+        webEngine.evaluateJavascript("setMic(true); triggerRing();", null)
         updateSubtext()
     }
 
