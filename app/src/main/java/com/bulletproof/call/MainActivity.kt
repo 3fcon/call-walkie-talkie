@@ -12,7 +12,9 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -58,6 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     private var ringtone: Ringtone? = null
     private var ringDialog: AlertDialog? = null
+    private var isHardwareKeyHeld = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,8 +83,7 @@ class MainActivity : AppCompatActivity() {
         displayCallsign = findViewById(R.id.displayCallsign)
         nodesContainer = findViewById(R.id.nodesContainer)
         activeNodesHeader = findViewById(R.id.activeNodesHeader)
-
-        checkPermissions()
+checkPermissions()
         setupDynamicWebEngine()
 
         connectToggleBtn.setOnClickListener {
@@ -126,7 +128,39 @@ class MainActivity : AppCompatActivity() {
         setupPttTouch()
     }
 
-    private fun checkPermissions() {
+    // Hardware Volume Down & Headset Button PTT Handler
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isConnected && !isListenOnly) {
+            val keyCode = event.keyCode
+            val isPttKey = keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+                           keyCode == KeyEvent.KEYCODE_HEADSETHOOK ||
+                           keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+
+            if (isPttKey) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    if (event.repeatCount == 0 && !isHardwareKeyHeld) {
+                        isHardwareKeyHeld = true
+                        triggerHaptic(60)
+                        if (currentMode == "hold") {
+                            startTx()
+                        } else {
+                            if (isTransmitting) stopTx() else startTx()
+                        }
+                    }
+                    return true
+                } else if (event.action == KeyEvent.ACTION_UP) {
+                    isHardwareKeyHeld = false
+                    if (currentMode == "hold") {
+                        triggerHaptic(40)
+                        stopTx()
+                    }
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+private fun checkPermissions() {
         val perms = mutableListOf(android.Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -219,8 +253,17 @@ class MainActivity : AppCompatActivity() {
                         initPeer();
                     });
                 }
-
-                function initPeer() {
+    private fun triggerHaptic(durationMs: Long) {
+        try {
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v?.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                v?.vibrate(durationMs)
+            }
+        } catch (_: Exception) {}
+    }
+function initPeer() {
                     peer = new Peer(myId, { debug: 0, config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] } });
                     peer.on('open', function() {
                         AndroidHost.onConnected();
@@ -379,8 +422,7 @@ class MainActivity : AppCompatActivity() {
             activeNodesHeader.text = "ACTIVE NODES ($count)"
         } catch (_: Exception) {}
     }
-
-    private fun triggerIncomingAlert(caller: String) {
+private fun triggerIncomingAlert(caller: String) {
         if (ringDialog?.isShowing == true) return
 
         try {
